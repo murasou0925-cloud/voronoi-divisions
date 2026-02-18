@@ -1,0 +1,248 @@
+%% 修論用障害物バージョン
+% RRTStarConnect_shuron，Cop_shuronと接続を行う
+% それ以外は共通
+
+clearvars
+close all
+
+
+% --- 【追加1】 画像保存先フォルダの設定 ---
+save_folder = 'C:\Users\Murakami\村上\先輩いじる\プログラム\RRT pawarpoint用\figure';
+if ~exist(save_folder, 'dir')
+    mkdir(save_folder); % フォルダがなければ作成
+end
+% ---------------------------------------
+
+% 初期設定
+f = figure('Position',[100 100 800 800]); hold on; box on;
+xlim([-8 8]); ylim([-7 7]); zlim([0 5]);
+animenum = 1;
+
+% 各種設定
+Param = Init;
+
+% スタートとゴール，RRTで探索した経路
+Param.start = [ 0, -4, 3];    % 機体の初期位置
+Param.goal  = [ 0, 3, 3];    % 機体の目標位置
+% RRT*-Connectでスタートからゴールまで経路を探索し，経由したノードをtruepathに保存
+truepath = voronoi_RRT(Param.start, Param.goal);
+
+% ゴールの描画
+for qnum = 1:1
+    scatter3(Param.goal(qnum,1),Param.goal(qnum,2),Param.goal(qnum,3), 100, 'p','MarkerEdgeColor',Param.Color(qnum));
+end
+
+obstacle1 = [-7, -5,-5 ,  5, 0, 5];
+obstacle2 = [ 5, 7, -5,  5, 0, 5];
+obstacle3 = [-1.75, -1.25, -1.5, 0.5, 0, 5];
+obstacle4 = [1.25, 1.75,  -1.5,  0.5, 0, 5];
+obstacle5 = [ -1.75,  1.75, 0.5, 1.25 , 0, 5];
+obstacle5_1 = [ -1.75,  1.75, 0.5, 1.0 , 0, 5];
+[vert1, fac1]   = vertObstacle(obstacle1);
+ [vert2, fac2]   = vertObstacle(obstacle2);
+ [vert3, fac3]   = vertObstacle(obstacle3);
+ [vert4, fac4]   = vertObstacle(obstacle4);
+ [vert5, fac5]   = vertObstacle(obstacle5_1);
+O(1)  = patch('Vertices',vert1,'Faces',fac1,'FaceVertexCData',hsv(6),'FaceColor','#696969', 'EdgeColor', '#696969');
+O(2)  = patch('Vertices',vert2,'Faces',fac2,'FaceVertexCData',hsv(6),'FaceColor','#696969', 'EdgeColor', '#696969');
+O(3)  = patch('Vertices',vert3,'Faces',fac3,'FaceVertexCData',hsv(6),'FaceColor','#696969', 'EdgeColor', '#696969');
+O(4)  = patch('Vertices',vert4,'Faces',fac4,'FaceVertexCData',hsv(6),'FaceColor','#696969', 'EdgeColor', '#696969');
+O(5)  = patch('Vertices',vert5,'Faces',fac5,'FaceVertexCData',hsv(6),'FaceColor','#696969', 'EdgeColor', '#696969');
+
+for n=1:length(O)
+    alpha(O(n), 0.3)
+end
+
+%% CoppeliaSimとの通信の初期設定
+sim = remApi("remoteApi"); % using the prototype file (remoteApiProto.m)
+sim.simxFinish(-1); % just in case, close all opened connections
+
+clientID = sim.simxStart('127.0.0.1',19997,true,true,5000,5);
+sim.simxStartSimulation(clientID,sim.simx_opmode_blocking);
+
+if clientID > -1
+    disp('Connected to remote API server');
+    sim.simxAddStatusbarMessage(clientID, 'Simulation Started!', sim.simx_opmode_oneshot);
+    sim.simxSynchronous(clientID, true); 
+else
+    disp('Connection Error');
+    quit
+end
+
+% Handle Setting
+[~, Quad]   = sim.simxGetObjectHandle(clientID, 'Quadcopter', sim.simx_opmode_blocking);
+[~, target] = sim.simxGetObjectHandle(clientID, 'target', sim.simx_opmode_blocking);
+
+% Get position and orientation data Setting
+[~, QuadPos] = sim.simxGetObjectPosition(clientID, Quad, -1, sim.simx_opmode_streaming);
+[~, QuadAng] = sim.simxGetObjectOrientation(clientID, Quad, -1, sim.simx_opmode_streaming);
+pause(0.1);
+
+% Get sensor data
+[~, ~] = sim.simxGetStringSignal(clientID, 'ranges11', sim.simx_opmode_streaming);
+%% 
+pause(0.1);
+
+%% メインループ
+g = 1;    % truepath(g,:)とし，まずはtruepath(1,:)とする
+% deltaを0.05とし，tが1からLIMまで更新を行う
+for t = 1:Param.delta:Param.LIM
+    % ボロノイ境界と一時目標点を更新のたびに消して再描画する
+    if t > 1 
+        delete(drawcurrpos); delete(drawsectp); delete(drawline); 
+        delete(td);
+        if exist('drawstepgoal')
+            delete(drawstepgoal);
+        end
+        if exist('drawvoronoi')
+            delete(drawvoronoi);
+        end
+        if exist('sensd1')
+            delete(sensd1);
+        end
+        if exist('drawnextstepgoal')
+            delete(drawnextstepgoal);
+        end
+    end
+
+    % 時間の描画
+    td=annotation('textbox', Param.tboxdim, 'String', ['{\it t} = ' num2str(t-1)],'EdgeColor','k','BackgroundColor','w','FontName','Times New Roman', 'FontSize',20);
+
+    % Get position and orientation
+    [~, QuadPos] = sim.simxGetObjectPosition(clientID, Quad, -1, sim.simx_opmode_buffer);
+    [~, QuadAng] = sim.simxGetObjectOrientation(clientID, Quad, -1, sim.simx_opmode_buffer);
+    pause(0.1);
+    
+    Param.X = QuadPos;
+    Param.stepgoal = truepath(g,:);
+    % tが1のとき，もしくは0.3のとき，ボロノイ分割を行う
+    if (rem(t-1,0.3) == 0 || t == 1)
+        % Get sensor data
+        [~, tmp_ranges] = sim.simxGetStringSignal(clientID, 'ranges11', sim.simx_opmode_buffer);
+        ranges = sim.simxUnpackFloats(tmp_ranges);
+
+        % ボロノイ分割に用いる母点を計算
+        [Param, ranges] = voronoi_Seed(Param, ranges, QuadAng, QuadPos, animenum);
+
+        % ボロノイ分割の計算
+        tic   % 計算時間を計測．ticで開始，tocで終了
+        [Param, alshp, secpoint, dist, vec2] = voronoi_Generator(Param);
+        elapsedTime(qnum,animenum) = toc;  % ボロノイ分割の計算にかかった時間を保存
+        eT = (elapsedTime)';
+        eT_max = max(eT);   % 計算時間の最大値
+        eT_min = min(eT);   % 計算時間の最小値
+        eT_ave = mean(eT);  % 計算時間の平均値
+    end
+   
+    %% 位置の更新（Coppeliasim上のクワッドロータの目標位置を動かす）
+
+    % ゴールが近ければ一時目標位置もターゲットボールもゴールに固定
+    if norm(Param.goal(1,:) - Param.X(1,:)) < 0.75
+        nexttarget = Param.goal(1,:);
+        sim.simxSetObjectPosition(clientID, target, -1, [nexttarget(1), nexttarget(2), nexttarget(3)], sim.simx_opmode_oneshot);
+    % t=1のとき（初回）と，ゴールが近くにない場合はターゲットボールの位置を更新
+    elseif t == 1 || norm(Param.X(1,:) - nexttarget) < 0.20
+        CheckDist = dist > Param.velocity; % サブゴールとの距離が次の１ステップサイズより大きいか確認
+        if CheckDist % サブゴールとの距離が遠ければ動かす
+            nexttarget = Param.X(1,:) + Param.velocity .* vec2; % 位置を更新(一定速度)
+            sim.simxSetObjectPosition(clientID, target, -1, [nexttarget(1), nexttarget(2), nexttarget(3)], sim.simx_opmode_oneshot);
+        else % サブゴールとの距離が近ければ一時目標位置をサブゴールに固定
+            nexttarget = secpoint;
+            sim.simxSetObjectPosition(clientID, target, -1, [nexttarget(1), nexttarget(2), nexttarget(3)], sim.simx_opmode_oneshot);
+        end
+    % stepgoalとXの距離が1.0未満，次のstepgoalが存在し，stepgoalとgoalが一致していないとき，位置を更新せず，g=g+1とする
+    elseif (norm(Param.stepgoal(1,:) - Param.X(1,:)) < 1.0) && (g < size(truepath, 1) && any(Param.stepgoal~=Param.goal))
+        nexttarget = Param.X(1,:) + Param.velocity .* vec2;
+        sim.simxSetObjectPosition(clientID, target, -1, [nexttarget(1), nexttarget(2), nexttarget(3)], sim.simx_opmode_oneshot);
+        g = g + 1;    % g=g+1とすることで，一時目標点を次の点に更新する
+    end
+
+     %% 描画
+    xlim([-8 8]); ylim([-7 7]); zlim([0 5]);
+    hold on; box on;
+    % 三次元ボロノイ領域の描画
+    if rem(t-1,0.3) == 0 || t == 1
+        drawvoronoi = plot(alshp, 'FaceAlpha', .5, 'EdgeAlpha', .2);
+    end
+    % 現在位置の描画
+    drawcurrpos = scatter3(Param.X(1,1), Param.X(1,2), Param.X(1,3), 100, '^', 'filled', 'MarkerFaceColor', Param.Color(1)); 
+    scatter3(Param.X(1,1), Param.X(1,2), Param.X(1,3), 3, 'filled', 'MarkerFaceColor', Param.Color(1));
+    % サブゴールの描画
+    drawsectp = scatter3(secpoint(1), secpoint(2), secpoint(3), 5, 'MarkerEdgeColor', Param.Color(1));  
+    % 直線の描画
+    drawline = plot3([secpoint(1) Param.X(1,1)], [secpoint(2) Param.X(1,2)], [secpoint(3) Param.X(1,3)], 'Color', Param.Color(1));
+    % センサの描画
+    if ~isempty(ranges)
+        if rem(t-1,0.3) == 0 || t == 1
+            sensd1 = scatter3(Param.newnearP(:,1), Param.newnearP(:,2), Param.newnearP(:,3), 10, 'filled', Param.Color(1), 'MarkerFaceAlpha', 1);
+        end
+    end
+    % stepgoalの描画
+    for o = g+1:1:size(truepath,1) - 1
+        drawstepgoal(o,:) = scatter3(truepath(o,1),truepath(o,2),truepath(o,3), 50, 'o', 'MarkerEdgeColor',Param.Color(1));
+    end
+    % 次のstepgoalの描画（次に目指すstepgoalは色を塗りつぶす）
+    if any(Param.stepgoal~=Param.goal)
+        drawnextstepgoal = scatter3(truepath(g,1),truepath(g,2),truepath(g,3), 50, 'o', 'MarkerEdgeColor', Param.Color(1), 'MarkerFaceColor',Param.Color(1));
+    end
+
+    % 軸範囲を再設定
+   xlim([-8 8]); ylim([-7 7]); zlim([0 5]);
+    drawnow
+
+    % --- 【追加2】 0.1秒ごとの画像保存処理 ---
+    current_time = t - 1;
+    % 浮動小数点の誤差を考慮して判定 (0.1秒ごと)
+    if abs(rem(current_time, 0.3)) < 1e-4
+        % ファイル名設定: Time_01.5s.png のようにソートしやすい名前
+        filename = sprintf('Time_%05.1fs.png', current_time);
+        full_filepath = fullfile(save_folder, filename);
+        
+        % 画像保存 (exportgraphics推奨ですが、環境に合わせてsaveasを使用)
+        saveas(gcf, full_filepath);
+        % ※より高画質にしたい場合は以下を使ってください
+        % exportgraphics(gcf, full_filepath, 'Resolution', 300);
+    end
+    % -----------------------------------------
+
+    Frame(animenum)=getframe(1);
+    animenum=animenum+1;   
+
+    % ゴールに到達したらループを抜ける
+    if norm(Param.goal(1,:) - Param.X(1,:)) < 0.5
+        break;
+    end
+
+    % ステップ描画用
+    if(rem(t-1,0.3)==0)
+        %savefig(['step',num2str(t-1),'.fig']);
+    end
+
+    % シミュレーションのステップを進める
+    sim.simxSynchronousTrigger(clientID);
+end
+
+% stop the simulation:
+sim.simxStopSimulation(clientID,sim.simx_opmode_blocking);
+
+% --- 【追加3】 終了時（ゴール到達時）の画像保存処理 ---
+% ループを抜けた時点の最後のフレームを保存します
+final_time = t - 1;
+final_filename = sprintf('Time_%05.1fs_Final.png', final_time);
+final_full_filepath = fullfile(save_folder, final_filename);
+saveas(gcf, final_full_filepath);
+disp(['Final image saved: ', final_full_filepath]);
+% ---------------------------------------------------
+% 終了処理
+sim.simxFinish(clientID);
+sim.delete();
+
+%% アニメーション書き出し用の処理
+Frate = 20;
+v = VideoWriter('C:\Users\Murakami\村上\先輩いじる\プログラム\RRT pawarpoint用\figure');
+v.FrameRate = Frate; % Framerate
+open(v);
+writeVideo(v,Frame);
+close(v);
+savefig('stepfinal.fig');
+%%
