@@ -220,36 +220,37 @@ for t = 1:Param.delta:Param.LIM
             sim.simxSetObjectPosition(clientID, target, -1, [nexttarget(1), nexttarget(2), nexttarget(3)], sim.simx_opmode_oneshot);
             disp('サブゴールを追従');
         else % デッドロック発生
-           [new_truepath,initial_goalflag] = RRT_unKnownobstacle(Param.X(1,:), Param.goal, KnownObstacles, UnknownPoints);
-
-               truepath = new_truepath; 
-               g=2;
-               Param.stepgoal = truepath(g,:); 
-               % 2. 【重要】新しいstepgoalに基づいて、再度ボロノイ生成を行う
-           % これにより、新しいルートへ向かうための正しいベクトル(vec2)と距離(dist)を再計算する
-
-           % Get sensor data
-              [~, tmp_ranges] = sim.simxGetStringSignal(clientID, 'ranges11', sim.simx_opmode_buffer);
-              ranges = sim.simxUnpackFloats(tmp_ranges);
-
-             % ボロノイ分割に用いる母点を計算
-             [Param, ranges] = voronoi_Seed(Param, ranges, QuadAng, QuadPos, animenum);
-
-              [Param, alshp, secpoint, dist, vec2] = voronoi_Generator(Param);
-
-           % 3. その場で待機せず、新しい方向に少し動かす（スタック回避のため）
-           % もし「1ステップ目は待機」が良い場合は、ここの移動命令をコメントアウトしても良いが、
-           % vec2が更新されていないと次ステップでも動かない可能性があるため、ここで更新しておくのが安全。
-           nexttarget = Param.X(1,:) + Param.velocity .* vec2;
-           sim.simxSetObjectPosition(clientID, target, -1, [nexttarget(1), nexttarget(2), nexttarget(3)], sim.simx_opmode_oneshot);
-
-
-
-
-            %     % CoppeliaSimに移動命令を送信（これをしないと動き出さない）
-            %    sim.simxSetObjectPosition(clientID, target, -1, [nexttarget(1), nexttarget(2), nexttarget(3)], sim.simx_opmode_oneshot);
+           % [new_truepath,initial_goalflag] = RRT_unKnownobstacle(Param.X(1,:), Param.goal, KnownObstacles, UnknownPoints);
+           % 
+           %     truepath = new_truepath; 
+           %     g=2;
+           %     Param.stepgoal = truepath(g,:); 
+           %     % 2. 【重要】新しいstepgoalに基づいて、再度ボロノイ生成を行う
+           % % これにより、新しいルートへ向かうための正しいベクトル(vec2)と距離(dist)を再計算する
+           % 
+           % % Get sensor data
+           %    [~, tmp_ranges] = sim.simxGetStringSignal(clientID, 'ranges11', sim.simx_opmode_buffer);
+           %    ranges = sim.simxUnpackFloats(tmp_ranges);
+           % 
+           %   % ボロノイ分割に用いる母点を計算
+           %   [Param, ranges] = voronoi_Seed(Param, ranges, QuadAng, QuadPos, animenum);
+           % 
+           %    [Param, alshp, secpoint, dist, vec2] = voronoi_Generator(Param);
+           % 
+           % % 3. その場で待機せず、新しい方向に少し動かす（スタック回避のため）
+           % % もし「1ステップ目は待機」が良い場合は、ここの移動命令をコメントアウトしても良いが、
+           % % vec2が更新されていないと次ステップでも動かない可能性があるため、ここで更新しておくのが安全。
+           % nexttarget = Param.X(1,:) + Param.velocity .* vec2;
+           % sim.simxSetObjectPosition(clientID, target, -1, [nexttarget(1), nexttarget(2), nexttarget(3)], sim.simx_opmode_oneshot);
+           % 
+           % 
+           % 
+           % 
+           %  %     % CoppeliaSimに移動命令を送信（これをしないと動き出さない）
+           %  %    sim.simxSetObjectPosition(clientID, target, -1, [nexttarget(1), nexttarget(2), nexttarget(3)], sim.simx_opmode_oneshot);
                disp('デッドロック発生');
-           
+            % 
+            % end
             
         end
     % stepgoalとXの距離が1.0未満，次のstepgoalが存在し，stepgoalとgoalが一致していないとき，位置を更新せず，g=g+1とする
