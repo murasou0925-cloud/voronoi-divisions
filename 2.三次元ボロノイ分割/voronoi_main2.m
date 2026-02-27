@@ -173,30 +173,7 @@ for t = 1:Param.delta:Param.LIM
 
     drawnow
 
-   % --- 指定時刻での画像保存処理 (ここを追加) ---
-    % 保存したい時刻のリスト
-    target_times = [0, 6, 12, 17.05];
-    
-    % 現在の表示時刻 (ループのtは1から始まるため、表示はt-1)
-    current_disp_time = t - 1;
-    
-    % 浮動小数点の誤差を考慮し、現在時刻がターゲットに近い場合に保存を実行
-    % (Param.delta の半分以下の誤差なら一致とみなす)
-    if any(abs(current_disp_time - target_times) < Param.delta / 2)
-        % ファイル名を生成 (例: snapshot_t_17.05.png)
-        img_filename = sprintf('snapshot_t_%g.png', current_disp_time);
-        
-        % 画像をPNG形式で保存
-        saveas(gcf, img_filename);
-        
-        % もしMATLABのバージョンがR2020a以降で、余白をカットして高画質で保存したい場合は
-        % 上の saveas の代わりに以下を使うと綺麗に出力されます
-        % exportgraphics(gcf, img_filename, 'Resolution', 300);
-        
-        disp(['Image saved: ', img_filename]);
-    end
-    % ------------------------------------------ 
-
+  
     Frame(animenum)=getframe(1);
     animenum=animenum+1;   
 
