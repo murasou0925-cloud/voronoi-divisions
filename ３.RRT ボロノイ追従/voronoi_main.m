@@ -6,12 +6,6 @@ clearvars
 close all
 
 
-% --- 【追加1】 画像保存先フォルダの設定 ---
-save_folder = 'C:\Users\Murakami\村上\先輩いじる\プログラム\RRT pawarpoint用\figure';
-if ~exist(save_folder, 'dir')
-    mkdir(save_folder); % フォルダがなければ作成
-end
-% ---------------------------------------
 
 % 初期設定
 f = figure('Position',[100 100 800 800]); hold on; box on;
@@ -190,20 +184,7 @@ for t = 1:Param.delta:Param.LIM
    xlim([-8 8]); ylim([-7 7]); zlim([0 5]);
     drawnow
 
-    % --- 【追加2】 0.1秒ごとの画像保存処理 ---
-    current_time = t - 1;
-    % 浮動小数点の誤差を考慮して判定 (0.1秒ごと)
-    if abs(rem(current_time, 0.3)) < 1e-4
-        % ファイル名設定: Time_01.5s.png のようにソートしやすい名前
-        filename = sprintf('Time_%05.1fs.png', current_time);
-        full_filepath = fullfile(save_folder, filename);
-        
-        % 画像保存 (exportgraphics推奨ですが、環境に合わせてsaveasを使用)
-        saveas(gcf, full_filepath);
-        % ※より高画質にしたい場合は以下を使ってください
-        % exportgraphics(gcf, full_filepath, 'Resolution', 300);
-    end
-    % -----------------------------------------
+   
 
     Frame(animenum)=getframe(1);
     animenum=animenum+1;   
@@ -225,21 +206,14 @@ end
 % stop the simulation:
 sim.simxStopSimulation(clientID,sim.simx_opmode_blocking);
 
-% --- 【追加3】 終了時（ゴール到達時）の画像保存処理 ---
-% ループを抜けた時点の最後のフレームを保存します
-final_time = t - 1;
-final_filename = sprintf('Time_%05.1fs_Final.png', final_time);
-final_full_filepath = fullfile(save_folder, final_filename);
-saveas(gcf, final_full_filepath);
-disp(['Final image saved: ', final_full_filepath]);
-% ---------------------------------------------------
+
 % 終了処理
 sim.simxFinish(clientID);
 sim.delete();
 
 %% アニメーション書き出し用の処理
 Frate = 20;
-v = VideoWriter('C:\Users\Murakami\村上\先輩いじる\プログラム\RRT pawarpoint用\figure');
+v = VideoWriter('');
 v.FrameRate = Frate; % Framerate
 open(v);
 writeVideo(v,Frame);
