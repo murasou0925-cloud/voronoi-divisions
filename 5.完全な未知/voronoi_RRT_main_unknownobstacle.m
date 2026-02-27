@@ -309,37 +309,7 @@ for t = 1:Param.delta:Param.LIM
         %savefig(['step',num2str(t-1),'.fig']);
     end
 
-   %  % -----------------------------------------------------------
-   %  % ★追加：1.5秒ごとに画像を保存する処理
-   %  % -----------------------------------------------------------
-   %  % 保存先フォルダの設定
-   %  save_dir = 'C:\Users\Murakami\村上\先輩いじる\プログラム\完全な未知\figure';
-   % 
-   %  % フォルダがなければ作成
-   %  if ~exist(save_dir, 'dir')
-   %      mkdir(save_dir);
-   %  end
-   % 
-   %  % 現在のシミュレーション時刻
-   %  current_time = t - 1;
-   % 
-   %  % 1.5秒間隔かどうかを判定（誤差を考慮）
-   %  % ※ t=0 も保存したい場合は「 || current_time == 0」を追加してください
-   %  if abs(rem(current_time, 1.5)) < Param.delta / 2
-   %      % ファイル名を生成 (例: sim_t_01.5.png)
-   %      % %04.1f は「全体4桁・小数1桁」でゼロ埋めする指定です（整列用）
-   %      fname = sprintf('sim_t_%04.1fv2.png', current_time);
-   %      full_path = fullfile(save_dir, fname);
-   % 
-   %      % 画像を保存
-   %      saveas(gcf, full_path);
-   % 
-   %      % (オプション) 余白をカットして高画質で保存したい場合は以下を使用
-   %      % exportgraphics(gcf, full_path, 'Resolution', 300);
-   % 
-   %      disp(['Image saved: ', full_path]);
-   %  end
-   % % -----------------------------------------------------------
+  
 
     % シミュレーションのステップを進める
     sim.simxSynchronousTrigger(clientID);
@@ -350,28 +320,11 @@ sim.simxStopSimulation(clientID,sim.simx_opmode_blocking);
 sim.simxFinish(clientID);
 sim.delete();
 
-% -----------------------------------------------------------
-% ★追加：終了時点の画像を保存
-% -----------------------------------------------------------
-% 保存先フォルダの設定
-save_dir = 'C:\Users\Murakami\村上\先輩いじる\プログラム\完全な未知\figure';
 
-% フォルダがなければ作成
-if ~exist(save_dir, 'dir')
-    mkdir(save_dir);
-end
-
-% 最終状態の画像ファイル名 (例: sim_final.png)
-final_fname = 'sim_finalv2.png';
-full_final_path = fullfile(save_dir, final_fname);
-
-% 画像を保存 (PNG形式)
-saveas(gcf, full_final_path);
-disp(['Final image saved: ', full_final_path]);
 
 %% アニメーション書き出し用の処理
 Frate = 20;
-v = VideoWriter('C:\Users\Murakami\村上\先輩いじる\プログラム\完全な未知\figure');
+v = VideoWriter('');
 v.FrameRate = Frate; % Framerate
 open(v);
 writeVideo(v,Frame);
